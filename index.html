@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="theme-color" content="#090c12">
+  <title>📜 Листарис</title>
+  
+  <!-- PWA: Manifest -->
+  <link rel="manifest" href="#manifest">
+  <script type="application/json" id="manifest">
+  {
+    "name": "Листарис",
+    "short_name": "Листарис",
+    "description": "Инкрементальная игра про археолога, раскрывающего тайны древней цивилизации",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#090c12",
+    "theme_color": "#090c12",
+    "icons": [
+      {
+        "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Ccircle cx='64' cy='64' r='60' fill='%230f172a'/%3E%3Ctext x='64' y='78' text-anchor='middle' font-size='60' fill='%235e60ce'%3E📜%3C/text%3E%3C/svg%3E",
+        "sizes": "128x128",
+        "type": "image/svg+xml"
+      },
+      {
+        "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Ccircle cx='256' cy='256' r='240' fill='%230f172a'/%3E%3Ctext x='256' y='300' text-anchor='middle' font-size='200' fill='%235e60ce'%3E📜%3C/text%3E%3C/svg%3E",
+        "sizes": "512x512",
+        "type": "image/svg+xml"
+      }
+    ]
+  }
+  </script>
+
+  <!-- PWA: Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => {
+          console.warn('SW registration failed:', err);
+        });
+      });
+    }
+  </script>
+  <script>
+    // Service Worker (встроенный, чтобы не создавать отдельный файл)
+    if (typeof window !== 'undefined') {
+      const swCode = `
+        const CACHE_NAME = 'listaris-v1';
+        const urlsToCache = [
+          './',
+          './?standalone=true'
+        ];
+
+        self.addEventListener('install', event => {
+          event.waitUntil(
+            caches.open(CACHE_NAME)
+              .then(cache => cache.addAll(urlsToCache))
+          );
+        });
+
+        self.addEventListener('fetch', event => {
+          if (event.request.method !== 'GET') return;
+          event.respondWith(
+            caches.match(event.request)
+              .then(response => response || fetch(event.request))
+          );
+        });
+      `;
+      const blob = new Blob([swCode], {type: 'application/javascript'});
+      const url = URL.createObjectURL(blob);
+      // Подменяем register, чтобы использовать blob
+      const originalRegister = navigator.serviceWorker.register;
+      navigator.serviceWorker.register = function() {
+        return originalRegister.call(this, url, { scope: './' });
+      };
+    }
+
+    // Сжатие
+    const compress = (str) => {
+      const data = new TextEncoder().encode(str);
+      const cs = new CompressionStream('deflate');
+      const writer = cs.writable.getWriter();
+      writer.write(data);
+      writer.close();
+      return new Response(cs.readable).arrayBuffer().then(ab => 
+        btoa(String.fromCharCode(...new Uint8Array(ab)))
+      );
+    };
+    const decompress = async (b64) => {
+      try {
+        const bin = atob(b64);
+        const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+        const ds = new DecompressionStream('deflate');
+        const writer = ds.writable.getWriter();
+        writer.write(bytes);
+        writer.close();
+        const ab = await new Response(ds.readable).arrayBuffer();
+        return new TextDecoder().decode(ab);
+      } catch (e) {
+        throw new Error('Неверный код сохранения');
+      }
+    };
+  </script>
+  <style>
+    :root {
+      --bg: #090c12;
+      --card: #141a26;
+      --panel: #1a2335;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --accent: #5e60ce;
+      --accent-light: #4cc9f0;
+      --success: #4ade80;
+      --experiment: #7209b7;
+      --crit: #ffcc00;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      padding: 12px;
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    @media (max-width: 600px) {
+      .container { padding: 8px; }
+      body { padding: 0; }
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    h1 {
+      font-size: 2.4rem;
+      background: linear-gradient(90deg, #5e60ce, #4cc9f0);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      margin: 16px 0;
+      letter-spacing: -0.5px;
+    }
+    @media (max-width: 480px) {
+      h1 { font-size: 2rem; }
+    }
+
+    .resources {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .res {
+      background: var(--card);
+      padding: 14px 12px;
+      border-radius: 12px;
+      text-align: center;
+      font-size: 1rem;
+      position: relative;
+    }
+    .res-value {
+      font-weight: bold;
+      font-size: 1.5rem;
+      margin-bottom: 4px;
+    }
+    .res-label {
+      font-size: 0.95rem;
+      opacity: 0.8;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 4px;
+    }
+    .res-per-sec {
+      font-size: 0.85rem;
+      opacity: 0.6;
+      margin-top: 4px;
+    }
+    .res-icon { font-size: 1.3rem; }
+
+    #actionZone {
+      background: var(--panel);
+      padding: 20px;
+      border-radius: 16px;
+      text-align: center;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    @media (max-width: 480px) {
+      #actionZone { padding: 16px; }
+    }
+    .action-title {
+      font-size: 1.3rem;
+      margin-bottom: 16px;
+      color: var(--accent-light);
+    }
+    #clickBtn {
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      color: white;
+      border: 2px solid var(--accent);
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      font-size: 1.6rem;
+      font-weight: bold;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+      margin: 0 auto;
+    }
+    @media (max-width: 480px) {
+      #clickBtn {
+        width: 160px;
+        height: 160px;
+        font-size: 1.4rem;
+      }
+    }
+    #clickBtn:hover {
+      transform: scale(1.04);
+      box-shadow: 0 0 25px rgba(94, 96, 206, 0.5);
+    }
+    #clickBtn:active {
+      transform: scale(0.96);
+    }
+    #clickBtn::after {
+      content: '📜';
+      position: absolute;
+      font-size: 3.5rem;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      opacity: 0.15;
+    }
+
+    .toasts {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      width: 320px;
+      max-width: 90vw;
+      pointer-events: none;
+    }
+    .toast {
+      background: rgba(30, 41, 59, 0.95);
+      color: white;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      border-left: 4px solid var(--accent);
+      animation: slideInRight 0.3s forwards, fadeOut 0.5s 2.5s forwards;
+      word-wrap: break-word;
+    }
+    .toast.event { border-left-color: var(--experiment); }
+    .toast.achievement { border-left-color: var(--success); }
+    @keyframes slideInRight {
+      from { transform: translateX(150%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+
+    .tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .tab {
+      background: var(--card);
+      border: none;
+      color: var(--muted);
+      padding: 10px 14px;
+      border-radius: 8px 8px 0 0;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .tab.active {
+      background: var(--panel);
+      color: white;
+      box-shadow: 0 -2px 6px rgba(0,0,0,0.2);
+    }
+    .tab:hover:not(.active) {
+      background: #1e293b;
+    }
+    @media (max-width: 480px) {
+      .tab { padding: 8px 10px; font-size: 0.85rem; }
+    }
+
+    .tab-content {
+      background: var(--card);
+      border-radius: 0 0 12px 12px;
+      padding: 18px;
+      min-height: 300px;
+    }
+    @media (max-width: 600px) {
+      .tab-content { padding: 14px; }
+    }
+
+    .items-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
+    }
+    @media (max-width: 600px) {
+      .items-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+    }
+    .item-card {
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+      padding: 16px;
+      transition: background 0.3s;
+    }
+    .item-card:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .item-title {
+      font-size: 1.25rem;
+      margin-bottom: 8px;
+      color: var(--accent-light);
+    }
+    .item-desc {
+      font-size: 0.95rem;
+      opacity: 0.85;
+      margin-bottom: 12px;
+      line-height: 1.4;
+    }
+    .item-stats {
+      font-size: 0.9rem;
+      opacity: 0.7;
+      margin-bottom: 14px;
+    }
+    .btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+      font-size: 1rem;
+    }
+    .btn:hover:not(:disabled) {
+      background: #4d50b9;
+      transform: translateY(-2px);
+    }
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .btn-bought {
+      background: var(--success) !important;
+      cursor: default;
+    }
+    .btn-experiment {
+      background: var(--experiment);
+    }
+    .btn-experiment:hover:not(:disabled) {
+      background: #5e0799;
+    }
+
+    .particle {
+      position: absolute;
+      pointer-events: none;
+      font-weight: bold;
+      text-shadow: 0 0 6px rgba(0,0,0,0.8);
+      animation: floatUp 1s forwards;
+    }
+    @keyframes floatUp {
+      0% { opacity: 1; transform: translateY(0) scale(1); }
+      100% { opacity: 0; transform: translateY(-100px) scale(0.9); }
+    }
+
+    .save-section {
+      margin-top: 16px;
+    }
+    .save-input {
+      width: 100%;
+      background: #0f172a;
+      color: #e2e8f0;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      margin: 10px 0;
+    }
+    .save-btns {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    @media (max-width: 480px) {
+      .save-btns { flex-direction: column; }
+      .save-btns .btn { width: 100%; }
+    }
+
+    .quote {
+      font-style: italic;
+      opacity: 0.9;
+      border-left: 3px solid var(--accent);
+      padding: 12px 16px;
+      margin: 16px 0;
+      background: rgba(94, 96, 206, 0.05);
+      border-radius: 0 8px 8px 0;
+    }
+
+    .lore-content {
+      line-height: 1.7;
+      opacity: 0.9;
+    }
+    .lore-content h3 {
+      color: var(--accent-light);
+      margin: 16px 0 10px;
+    }
+    .lore-contact {
+      text-align: center;
+      padding: 16px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 0.95rem;
+      margin-top: 20px;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 30px;
+      opacity: 0.6;
+      font-size: 0.9rem;
+    }
+
+    /* Install prompt */
+    #installPrompt {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      right: 20px;
+      background: var(--panel);
+      padding: 12px 16px;
+      border-radius: 12px;
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 1000;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    #installBtn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 8px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="container">
+    <div class="toasts">
+      <div v-for="t in toasts" 
+           :key="t.id" 
+           class="toast" 
+           :class="{'event': t.type === 'event', 'achievement': t.type === 'achievement'}">
+        {{ t.text }}
+      </div>
+    </div>
+
+    <header>
+      <h1>📜 Листарис</h1>
+    </header>
+
+    <div class="resources">
+      <div class="res">
+        <div class="res-label"><span class="res-icon">📜</span> Листы</div>
+        <div class="res-value">{{ fmt(coins) }}</div>
+        <div class="res-per-sec" v-if="getCoinsPerSec() > 0">+{{ fmt(getCoinsPerSec()) }}/сек</div>
+      </div>
+      <div class="res" v-if="showEnergy()">
+        <div class="res-label"><span class="res-icon">⚡</span> Энергия</div>
+        <div class="res-value">{{ fmt(energy) }}</div>
+        <div class="res-per-sec" v-if="getEnergyPerSec() > 0">+{{ fmt(getEnergyPerSec()) }}/сек</div>
+      </div>
+      <div class="res" v-if="showCrystals()">
+        <div class="res-label"><span class="res-icon">💎</span> Кристаллы</div>
+        <div class="res-value">{{ fmt(crystals) }}</div>
+        <div class="res-per-sec" v-if="getCrystalsPerSec() > 0">+{{ fmt(getCrystalsPerSec()) }}/сек</div>
+      </div>
+      <div class="res" v-if="souls > 0 || prestigeLevel > 0">
+        <div class="res-label"><span class="res-icon">🧠</span> Понимание</div>
+        <div class="res-value">{{ souls }}</div>
+      </div>
+    </div>
+
+    <div id="actionZone">
+      <div class="action-title">ЛИСТАЙ Книгу Вселенной</div>
+      <button id="clickBtn" @click="click">📜</button>
+      <div v-for="p in particles" 
+           :key="p.id"
+           class="particle"
+           :style="{
+             left: p.x + 'px',
+             top: p.y + 'px',
+             color: p.color,
+             fontSize: p.size
+           }">
+        {{ p.text }}
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab" :class="{active: activeTab === 'dig'}" @click="activeTab = 'dig'">⛏️ Раскопки</button>
+      <button class="tab" :class="{active: activeTab === 'research'}" @click="activeTab = 'research'">🔬 Исследования</button>
+      <button class="tab" :class="{active: activeTab === 'experiments'}" @click="activeTab = 'experiments'">🧪 Эксперименты</button>
+      <button class="tab" :class="{active: activeTab === 'achievements'}" @click="activeTab = 'achievements'">🏆 Достижения</button>
+      <button class="tab" :class="{active: activeTab === 'lore'}" @click="activeTab = 'lore'">📖 Лор</button>
+      <button class="tab" :class="{active: activeTab === 'save'}" @click="activeTab = 'save'">💾 Сохранение</button>
+    </div>
+
+    <div class="tab-content">
+      <!-- Раскопки -->
+      <div v-if="activeTab === 'dig'">
+        <h2 style="color: var(--accent-light); margin-bottom: 16px;">🏗️ Археологические комплексы</h2>
+        <p style="opacity: 0.8; margin-bottom: 16px;">Стройте сооружения — они будут автоматически собирать Листы и ресурсы.</p>
+        <div class="items-grid">
+          <div class="item-card" v-for="b in getVisibleBuildings()" :key="b.id">
+            <div class="item-title">{{ b.name }} ({{ b.count }})</div>
+            <div class="item-desc">{{ b.desc }}</div>
+            <div class="item-stats">
+              +{{ fmt(getBuildingIncome(b)) }} 📜/сек<br>
+              Стоимость: {{ fmt(getBuildingCost(b)) }} 📜
+            </div>
+            <button class="btn" 
+                    @click="buyBuilding(b)"
+                    :disabled="coins < getBuildingCost(b)">
+              Раскопать
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Исследования -->
+      <div v-if="activeTab === 'research'">
+        <h2 style="color: var(--accent-light); margin-bottom: 16px;">🔬 Научные открытия</h2>
+        <p style="opacity: 0.8; margin-bottom: 16px;">Изучайте технологии древних, чтобы усилить свою работу.</p>
+        <div class="items-grid">
+          <div class="item-card" v-for="u in getVisibleUpgrades()" :key="u.id">
+            <div class="item-title">{{ u.name }} {{ u.bought ? '✅' : '' }}</div>
+            <div class="item-desc">{{ u.desc }}</div>
+            <div class="item-stats">Цена: {{ fmt(u.cost) }} {{ u.costRes }}</div>
+            <button 
+              class="btn" 
+              :class="{'btn-bought': u.bought}"
+              @click="buyUpgrade(u)"
+              :disabled="u.bought || !canAfford(u)">
+              {{ u.bought ? 'Изучено' : 'Изучить' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Эксперименты -->
+      <div v-if="activeTab === 'experiments'">
+        <h2 style="color: var(--accent-light); margin-bottom: 16px;">🧪 Полевые эксперименты</h2>
+        <p style="opacity: 0.8; margin-bottom: 16px;">Проверяйте гипотезы — за плату и с риском.</p>
+        <div class="items-grid">
+          <div class="item-card" v-for="e in getVisibleExperiments()" :key="e.id">
+            <div class="item-title">{{ e.name }}</div>
+            <div class="item-desc">{{ e.desc }}</div>
+            <div class="item-stats" v-if="e.cost > 0">Цена: {{ fmt(e.cost) }} 📜</div>
+            <div class="item-stats" v-if="e.energyCost > 0">Требует: {{ e.energyCost }} ⚡</div>
+            <div class="item-stats" v-if="e.cooldown > 0">Ожидание: {{ e.cooldown }} сек</div>
+            <button 
+              class="btn btn-experiment"
+              @click="runExperiment(e)"
+              :disabled="!canRunExperiment(e)">
+              {{ e.cooldown > 0 ? '⏳' : e.buttonText }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Достижения -->
+      <div v-if="activeTab === 'achievements'">
+        <h2 style="color: var(--accent-light); margin-bottom: 16px;">🏆 Археологические награды</h2>
+        <div class="items-grid">
+          <div class="item-card" v-for="a in achievements" :key="a.id">
+            <div class="item-title" :style="{opacity: a.unlocked ? 1 : 0.6}">
+              {{ a.name }} {{ a.unlocked ? '🏆' : '🔒' }}
+            </div>
+            <div class="item-desc">{{ a.desc }}</div>
+            <div v-if="!a.unlocked" class="item-stats">Прогресс: {{ getAchievementProgress(a) }}%</div>
+          </div>
+        </div>
+        <div v-if="quotes.length" class="quote">
+          «{{ currentQuote }}»
+        </div>
+      </div>
+
+      <!-- Лор -->
+      <div v-if="activeTab === 'lore'" class="lore-content">
+        <h3>I. Начало</h3>
+        <p>Планета Листарис — не каменная глыба. Это <i>огромная книга</i>, упакованная в геологические слои. Каждая страница — пласт осадочных пород. Каждая глава — эпоха.</p>
+        
+        <h3>II. Космо-Листары</h3>
+        <p>Их цивилизация не строила башни в небо — они <i>копали вглубь</i>, к ядру, где, по их верованиям, хранился «Первый Лист» — код Вселенной. Они не говорили — они <i>листили</i> реальность, меняя её через ритуальное чтение.</p>
+        
+        <h3>III. Крах</h3>
+        <p>Когда они добрались до ядра, они <i>прочитали слишком быстро</i>. Реальность не выдержала скорости — и схлопнулась. Остались только обелиски, шепчущие цитаты в эфир.</p>
+        
+        <h3>IV. Ты</h3>
+        <p>Ты — не завоеватель. Ты — <i>читатель</i>. Твоя задача — не уничтожить, а <i>понять</i>. Каждый клик — это поворот страницы. Каждое здание — новая глава. Каждое Понимание — шаг к Первой Странице.</p>
+        
+        <h3>V. Авторство (Глава IV)</h3>
+        <p>Когда ты осознаешь себя как со-автора Вселенной, ты перестаешь листать — ты <i>пишешь</i>. Твои клики становятся буквами, здания — абзацами, а Понимание — пунктуацией. Ты не восстанавливаешь книгу. Ты продолжаешь её.</p>
+
+        <div class="lore-contact">
+          📬 Вопросы, идеи, прозрения? Пишите: <b>johnbrotherwood@gmail.com</b>
+        </div>
+
+        <div class="quote" v-if="currentLoreQuote">
+          «{{ currentLoreQuote }}»
+        </div>
+      </div>
+
+      <!-- Сохранение -->
+      <div v-if="activeTab === 'save'">
+        <h2 style="color: var(--accent-light); margin-bottom: 16px;">💾 Управление архивом</h2>
+        <p style="opacity: 0.8; margin-bottom: 16px;">Сохраните прогресс, чтобы продолжить исследование позже.</p>
+        
+        <div class="save-section">
+          <button class="btn" @click="exportSave">📤 Сгенерировать код</button>
+          <input ref="saveInput" v-model="saveCode" class="save-input" placeholder="Вставьте код сохранения..." />
+          <div class="save-btns">
+            <button class="btn" style="background: var(--success);" @click="importSave">📥 Загрузить</button>
+            <button class="btn" style="background: #64748b;" @click="saveCode = ''">🗑️ Очистить</button>
+          </div>
+          <p v-if="saveMessage" :style="{color: saveMessage.includes('Успех') ? 'var(--success)' : '#f87171', marginTop: '8px'}">
+            {{ saveMessage }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      🌌 Андрей, ты не просто играешь. Ты — читаешь Вселенную.
+    </footer>
+  </div>
+
+  <!-- PWA: Install prompt -->
+  <div id="installPrompt">
+    <div>Хотите установить «Листарис» на устройство?</div>
+    <button id="installBtn">Установить</button>
+  </div>
+
+  <script>
+    const { createApp } = Vue;
+
+    const QUOTES = [
+      "Каждый клик — это вопрос. Каждый Лист — ответ.",
+      "Энергия — не топливо. Это внимание Вселенной к твоему чтению.",
+      "Понимание рождается не от скорости, а от глубины.",
+      "Обелиск не говорит. Он ждёт, пока ты научишься слушать тишину между буквами.",
+      "Кристаллы — это застывшие мысли древних. Их нужно не добывать — расшифровывать.",
+      "Глава заканчивается не тогда, когда кончается текст, а когда читатель делает паузу и задумывается.",
+      "Ты не находишь смысл. Ты — даёшь его.",
+      "Когда ты перестанешь листать и начнёшь писать — начнётся Глава IV."
+    ];
+
+    const LORE_QUOTES = [
+      "Тот, кто листает быстро, видит сюжет. Тот, кто листает медленно — понимает смысл.",
+      "Космо-Листары не верили в смерть. Они верили в паузу между главами.",
+      "Первый Лист не содержит слов. Он содержит вопрос, на который Вселенная ищет ответ вот уже 13.8 миллиардов лет.",
+      "Авторство — это не право. Это ответственность за каждую запятую в коде реальности."
+    ];
+
+    createApp({
+      data() {
+        return {
+          coins: 0,
+          energy: 0,
+          crystals: 0,
+          souls: 0,
+          totalClicks: 0,
+          totalCoins: 0,
+          clickPower: 1,
+          critChance: 0.05,
+          critMultiplier: 3,
+          chapter: 1,
+          prestigeLevel: 0,
+          buildings: [
+            { id: 'excavator', name: 'Экскаваторный рой', desc: 'Роботы-муравьи копают первый слой', baseIncome: 0.2, count: 0, costBase: 25, costExp: 1.12, chapter: 1 },
+            { id: 'lab', name: 'Полевая лаборатория', desc: 'Анализирует Листы, выделяя Энергию', baseIncome: 0.05, count: 0, costBase: 150, costExp: 1.1, chapter: 1 },
+            { id: 'crystalMine', name: 'Кристаллическая шахта', desc: 'Добывает кристаллы из второго слоя', baseIncome: 0.01, count: 0, costBase: 500, costExp: 1.08, chapter: 2 },
+            { id: 'obelisk', name: 'Обелиск Памяти', desc: 'Связь с древними разумами', baseIncome: 0.001, count: 0, costBase: 5000, costExp: 1.05, chapter: 2 },
+            { id: 'authorTable', name: 'Писательский стол', desc: 'Позволяет писать новые Листы', baseIncome: 0.0005, count: 0, costBase: 50000, costExp: 1.04, chapter: 4 }
+          ],
+          upgrades: [
+            { id: 'strongerHands', name: 'Сильные руки', desc: '+1 к листанию', cost: 50, costRes: '📜', bought: false, effect: () => { this.clickPower += 1; }, chapter: 1 },
+            { id: 'crit', name: 'Острый взгляд', desc: '5% шанс ×3 (лист с треском!)', cost: 200, costRes: '📜', bought: false, effect: () => { this.critChance += 0.05; }, chapter: 1 },
+            { id: 'robotHelpers', name: 'Робо-ассистенты', desc: 'Экскаваторы ×2', cost: 400, costRes: '📜', bought: false, effect: () => {}, chapter: 1 },
+            { id: 'energyConverter', name: 'Конвертер энергии', desc: 'Лаборатории дают +50% Энергии', cost: 800, costRes: '📜', bought: false, effect: () => { this.energyBonus = 0.5; }, chapter: 2 },
+            { id: 'crystalFocus', name: 'Фокусировка кристаллов', desc: 'Кристаллы приносят +10% Энергии', cost: 30, costRes: '💎', bought: false, effect: () => { this.crystalEnergyBonus = 0.1; }, chapter: 2 },
+            { id: 'prestige', name: 'Первое прозрение', desc: 'Сбрось всё и получи Понимание', cost: 10000, costRes: '📜', bought: false, effect: this.prestige, chapter: 2 },
+            { id: 'authorPen', name: 'Перо Автора', desc: 'Клики дают +0.1 Понимания', cost: 20, costRes: '🧠', bought: false, effect: () => { this.authorPower = 0.1; }, chapter: 4 },
+            { id: 'realityInk', name: 'Чернила Реальности', desc: 'Понимание даёт +1% ко всем доходам', cost: 5, costRes: '🧠', bought: false, effect: () => { this.realityBonus += 0.01; }, chapter: 4 }
+          ],
+          energyBonus: 0,
+          crystalEnergyBonus: 0,
+          authorPower: 0,
+          realityBonus: 0,
+          experiments: [
+            { 
+              id: 'speedRead', 
+              name: 'Скорочтение', 
+              desc: '×3 к клику на 8 секунд', 
+              cost: 500,
+              energyCost: 10,
+              cooldown: 0, 
+              maxCooldown: 45,
+              buttonText: 'ЛИСТАТЬ БЫСТРЕЕ!',
+              chapter: 2,
+              run: () => {
+                const orig = this.clickPower;
+                this.clickPower *= 3;
+                setTimeout(() => { this.clickPower = orig; }, 8000);
+              }
+            },
+            {
+              id: 'soulEcho',
+              name: 'Эхо душ',
+              desc: 'Позвать древнего хранителя — получить Понимание',
+              cost: 5000,
+              energyCost: 50,
+              cooldown: 0,
+              maxCooldown: 120,
+              buttonText: 'Позвать хранителя',
+              chapter: 3,
+              run: () => {
+                const gain = Math.max(1, Math.floor(this.coins / 10000));
+                this.souls += gain;
+              }
+            },
+            {
+              id: 'writeNewPage',
+              name: 'Написать страницу',
+              desc: 'Создать новый Лист Вселенной',
+              cost: 1000,
+              soulsCost: 1,
+              cooldown: 0,
+              maxCooldown: 10,
+              buttonText: '🖋️ Написать',
+              chapter: 4,
+              run: () => {
+                this.coins += 1000;
+                this.addToast('🖋️ Новый Лист добавлен в Книгу!', 'event');
+              }
+            }
+          ],
+          achievements: [
+            { id: 'click100', name: '100 страниц', desc: 'Листайте 100 раз', unlocked: false, goal: 100, current: () => this.totalClicks },
+            { id: 'coins1k', name: 'Тысяча Листов', desc: 'Соберите 1000 Листов', unlocked: false, goal: 1000, current: () => this.coins },
+            { id: 'building10', name: 'Археолог-строитель', desc: 'Постройте 10 сооружений', unlocked: false, goal: 10, current: () => this.buildings.reduce((s,b)=>s+b.count,0) },
+            { id: 'firstCrit', name: 'Треск страницы', desc: 'Впервые листайте с треском', unlocked: false, goal: 1, current: () => this.achievements.find(a=>a.id==='firstCrit')?.unlocked ? 1 : 0 },
+            { id: 'author', name: 'Автор', desc: 'Напишите первую страницу', unlocked: false, goal: 1, current: () => this.achievements.find(a=>a.id==='author')?.unlocked ? 1 : 0 }
+          ],
+          activeTab: 'dig',
+          particles: [],
+          toasts: [],
+          saveCode: '',
+          saveMessage: '',
+          quotes: QUOTES,
+          currentQuote: QUOTES[0],
+          currentLoreQuote: LORE_QUOTES[0],
+          deferredPrompt: null
+        }
+      },
+
+      methods: {
+        fmt(num) {
+          if (num >= 1e12) return (num/1e12).toFixed(2) + 'T';
+          if (num >= 1e9) return (num/1e9).toFixed(2) + 'B';
+          if (num >= 1e6) return (num/1e6).toFixed(2) + 'M';
+          if (num >= 1e3) return (num/1e3).toFixed(1) + 'k';
+          return Math.floor(num);
+        },
+
+        getRandomQuote() {
+          return this.quotes[Math.floor(Math.random() * this.quotes.length)];
+        },
+
+        addToast(text, type = 'info') {
+          const id = Date.now();
+          this.toasts.push({ id, text, type });
+          setTimeout(() => {
+            this.toasts = this.toasts.filter(t => t.id !== id);
+          }, 3000);
+        },
+
+        click(e) {
+          this.totalClicks++;
+          let amount = this.clickPower;
+          let isCrit = false;
+
+          if (Math.random() < this.critChance) {
+            amount *= this.critMultiplier;
+            isCrit = true;
+            const ach = this.achievements.find(a => a.id === 'firstCrit');
+            if (ach && !ach.unlocked) {
+              ach.unlocked = true;
+              this.addToast(`🏆 ${ach.name}`, 'achievement');
+            }
+          }
+
+          this.coins += amount;
+          this.totalCoins += amount;
+          this.souls += this.authorPower;
+
+          const rect = e.target.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          this.spawnParticle(x, y, isCrit ? 'ТРЕСК!' : '+' + Math.floor(amount), isCrit ? 'var(--crit)' : 'white', isCrit ? '1.5rem' : '1.2rem');
+
+          if (this.totalClicks % 50 === 0) {
+            this.currentQuote = this.getRandomQuote();
+            this.addToast(`«${this.currentQuote}»`, 'info');
+          }
+        },
+
+        spawnParticle(x, y, text, color, fontSize = '1rem') {
+          const id = Date.now() + Math.random();
+          this.particles.push({ id, x, y, text, color, size: fontSize });
+          setTimeout(() => {
+            this.particles = this.particles.filter(p => p.id !== id);
+          }, 1000);
+        },
+
+        // Глава IV: Авторство
+        unlockChapter4() {
+          if (this.chapter < 4 && this.prestigeLevel >= 3) {
+            this.chapter = 4;
+            this.addToast(`챕️ Глава IV открыта: «Авторство»`, 'event');
+            this.currentLoreQuote = LORE_QUOTES[3];
+            const ach = this.achievements.find(a => a.id === 'author');
+            if (ach && !ach.unlocked) ach.unlocked = true;
+          }
+        },
+
+        // Методы вместо computed (чтобы избежать гонки)
+        showEnergy() {
+          return this.buildings.some(b => b.id === 'lab' && b.count > 0) || this.energy > 0;
+        },
+        showCrystals() {
+          return this.buildings.some(b => b.id === 'crystalMine' && b.count > 0) || this.crystals > 0;
+        },
+        getCoinsPerSec() {
+          return this.buildings.reduce((sum, b) => sum + this.getBuildingIncome(b), 0) * (1 + this.realityBonus);
+        },
+        getEnergyPerSec() {
+          if (!this.showEnergy()) return 0;
+          return (this.buildings.find(b => b.id === 'lab')?.count * 0.03 * (1 + this.energyBonus) || 0) +
+                 (this.buildings.find(b => b.id === 'crystalMine')?.count * 0.005 * (1 + this.crystalEnergyBonus) || 0);
+        },
+        getCrystalsPerSec() {
+          if (!this.showCrystals()) return 0;
+          return this.buildings.find(b => b.id === 'crystalMine')?.count * 0.002 || 0;
+        },
+
+        getVisibleBuildings() {
+          return this.buildings.filter(b => b.chapter <= this.chapter);
+        },
+        getVisibleUpgrades() {
+          return this.upgrades.filter(u => u.chapter <= this.chapter);
+        },
+        getVisibleExperiments() {
+          return this.experiments.filter(e => e.chapter <= this.chapter);
+        },
+
+        getBuildingCost(building) {
+          return Math.floor(building.costBase * Math.pow(building.costExp, building.count));
+        },
+        getBuildingIncome(building) {
+          let mult = 1;
+          if (building.id === 'excavator' && this.upgrades.find(u => u.id === 'robotHelpers')?.bought) {
+            mult *= 2;
+          }
+          return building.count * building.baseIncome * mult * (1 + this.realityBonus);
+        },
+
+        buyBuilding(building) {
+          const cost = this.getBuildingCost(building);
+          if (this.coins >= cost) {
+            this.coins -= cost;
+            building.count++;
+            this.addToast(`🏗️ ${building.name} построен`, 'info');
+          }
+        },
+
+        canAfford(upgrade) {
+          if (upgrade.costRes === '📜') return this.coins >= upgrade.cost;
+          if (upgrade.costRes === '💎') return this.crystals >= upgrade.cost;
+          if (upgrade.costRes === '🧠') return this.souls >= upgrade.cost;
+          return false;
+        },
+        buyUpgrade(upgrade) {
+          if (upgrade.bought || !this.canAfford(upgrade)) return;
+          
+          if (upgrade.costRes === '📜') this.coins -= upgrade.cost;
+          if (upgrade.costRes === '💎') this.crystals -= upgrade.cost;
+          if (upgrade.costRes === '🧠') this.souls -= upgrade.cost;
+
+          upgrade.bought = true;
+          upgrade.effect();
+          this.addToast(`🔬 ${upgrade.name} изучено`, 'info');
+
+          if (upgrade.id === 'prestige' && this.prestigeLevel < 1) {
+            this.chapter = 2;
+            this.addToast(`챕️ Глава II открыта: «Осознание»`, 'event');
+            this.currentLoreQuote = LORE_QUOTES[1];
+          } else if (this.prestigeLevel >= 1 && this.chapter < 3) {
+            this.chapter = 3;
+            this.addToast(`챕️ Глава III открыта: «Прозрение»`, 'event');
+            this.currentLoreQuote = LORE_QUOTES[2];
+          }
+          this.unlockChapter4();
+        },
+
+        canRunExperiment(exp) {
+          if (exp.cooldown > 0) return false;
+          if (this.coins < exp.cost) return false;
+          if (exp.energyCost && this.energy < exp.energyCost) return false;
+          if (exp.soulsCost && this.souls < exp.soulsCost) return false;
+          return true;
+        },
+        runExperiment(exp) {
+          if (!this.canRunExperiment(exp)) return;
+          
+          this.coins -= exp.cost;
+          if (exp.energyCost) this.energy -= exp.energyCost;
+          if (exp.soulsCost) this.souls -= exp.soulsCost;
+
+          exp.run();
+          this.addToast(`🧪 ${exp.name} запущен`, 'event');
+
+          exp.cooldown = exp.maxCooldown;
+          const interval = setInterval(() => {
+            exp.cooldown--;
+            if (exp.cooldown <= 0) {
+              clearInterval(interval);
+            }
+          }, 1000);
+        },
+
+        prestige() {
+          const gain = Math.max(1, Math.floor(Math.sqrt(this.coins / 1000)));
+          if (gain < 1) return;
+
+          this.coins = 0;
+          this.energy = 0;
+          this.crystals = 0;
+          this.buildings.forEach(b => b.count = 0);
+          this.upgrades.filter(u => u.id !== 'prestige').forEach(u => u.bought = false);
+          this.clickPower = 1;
+          this.critChance = 0.05;
+          this.energyBonus = 0;
+          this.crystalEnergyBonus = 0;
+          this.prestigeLevel++;
+
+          this.souls += gain;
+
+          if (this.prestigeLevel === 1 && this.chapter < 2) {
+            this.chapter = 2;
+            this.addToast(`챕️ Глава II открыта: «Осознание»`, 'event');
+            this.currentLoreQuote = LORE_QUOTES[1];
+          } else if (this.prestigeLevel === 2 && this.chapter < 3) {
+            this.chapter = 3;
+            this.addToast(`챕️ Глава III открыта: «Прозрение»`, 'event');
+            this.currentLoreQuote = LORE_QUOTES[2];
+          }
+          this.unlockChapter4();
+
+          this.addToast(`🧠 +${gain} Понимания`, 'event');
+        },
+
+        async exportSave() {
+          try {
+            const state = {
+              coins: this.coins,
+              energy: this.energy,
+              crystals: this.crystals,
+              souls: this.souls,
+              totalClicks: this.totalClicks,
+              totalCoins: this.totalCoins,
+              clickPower: this.clickPower,
+              critChance: this.critChance,
+              chapter: this.chapter,
+              prestigeLevel: this.prestigeLevel,
+              buildings: this.buildings.map(b => ({ id: b.id, count: b.count })),
+              upgrades: this.upgrades.map(u => ({ id: u.id, bought: u.bought })),
+              energyBonus: this.energyBonus,
+              crystalEnergyBonus: this.crystalEnergyBonus,
+              authorPower: this.authorPower,
+              realityBonus: this.realityBonus,
+              ver: '4.0'
+            };
+            const json = JSON.stringify(state);
+            const compressed = await compress(json);
+            this.saveCode = compressed;
+
+            // Попытка скопировать
+            try {
+              await navigator.clipboard.writeText(compressed);
+              this.saveMessage = '✅ Код скопирован в буфер!';
+            } catch (err) {
+              // Резерв: выделить текст
+              this.$nextTick(() => {
+                this.$refs.saveInput.focus();
+                this.$refs.saveInput.select();
+                this.saveMessage = '📋 Код выделен. Нажмите Ctrl+C (Cmd+C)';
+              });
+            }
+            setTimeout(() => this.saveMessage = '', 3000);
+          } catch (e) {
+            this.saveMessage = '❌ Ошибка: ' + e.message;
+          }
+        },
+        async importSave() {
+          try {
+            if (!this.saveCode.trim()) {
+              this.saveMessage = '⚠️ Вставьте код сохранения';
+              return;
+            }
+            const json = await decompress(this.saveCode);
+            const data = JSON.parse(json);
+
+            Object.assign(this, {
+              coins: data.coins || 0,
+              energy: data.energy || 0,
+              crystals: data.crystals || 0,
+              souls: data.souls || 0,
+              totalClicks: data.totalClicks || 0,
+              totalCoins: data.totalCoins || 0,
+              clickPower: data.clickPower || 1,
+              critChance: data.critChance || 0.05,
+              chapter: data.chapter || 1,
+              prestigeLevel: data.prestigeLevel || 0,
+              energyBonus: data.energyBonus || 0,
+              crystalEnergyBonus: data.crystalEnergyBonus || 0,
+              authorPower: data.authorPower || 0,
+              realityBonus: data.realityBonus || 0
+            });
+
+            if (data.buildings) {
+              this.buildings.forEach(b => {
+                const saved = data.buildings.find(sb => sb.id === b.id);
+                if (saved) b.count = saved.count || 0;
+              });
+            }
+            if (data.upgrades) {
+              data.upgrades.forEach(saved => {
+                const u = this.upgrades.find(u => u.id === saved.id);
+                if (u) u.bought = saved.bought;
+              });
+            }
+
+            this.saveMessage = '✅ Прогресс загружен!';
+            this.addToast('🌍 Архив восстановлен', 'info');
+          } catch (e) {
+            this.saveMessage = '❌ Неверный код: ' + e.message;
+          }
+        },
+
+        getAchievementProgress(ach) {
+          if (ach.unlocked) return 100;
+          const current = ach.current();
+          return Math.min(100, Math.floor((current / ach.goal) * 100));
+        }
+      },
+
+      mounted() {
+        // Загрузка
+        const saved = localStorage.getItem('listarisSave_v4');
+        if (saved) {
+          try {
+            const data = JSON.parse(saved);
+            Object.keys(data).forEach(key => {
+              if (key in this.$data) this[key] = data[key];
+            });
+          } catch (e) {
+            console.warn('Load failed', e);
+          }
+        }
+
+        // Игровой цикл
+        setInterval(() => {
+          this.coins += this.getCoinsPerSec() / 10;
+          if (this.showEnergy()) this.energy += this.getEnergyPerSec() / 10;
+          if (this.showCrystals()) this.crystals += this.getCrystalsPerSec() / 10;
+
+          if (Math.random() < 0.005) {
+            localStorage.setItem('listarisSave_v4', JSON.stringify({
+              coins: this.coins,
+              chapter: this.chapter,
+              prestigeLevel: this.prestigeLevel,
+              souls: this.souls
+            }));
+          }
+
+          this.achievements.forEach(a => {
+            if (!a.unlocked && a.current() >= a.goal) {
+              a.unlocked = true;
+              this.addToast(`🏆 ${a.name}`, 'achievement');
+            }
+          });
+        }, 100);
+
+        setInterval(() => {
+          this.currentQuote = this.getRandomQuote();
+        }, 20000);
+
+        // PWA install prompt
+        window.addEventListener('beforeinstallprompt', (e) => {
+          e.preventDefault();
+          this.deferredPrompt = e;
+          document.getElementById('installPrompt').style.display = 'flex';
+        });
+
+        document.getElementById('installBtn')?.addEventListener('click', () => {
+          if (this.deferredPrompt) {
+            this.deferredPrompt.prompt();
+            this.deferredPrompt.userChoice.then(() => {
+              document.getElementById('installPrompt').style.display = 'none';
+              this.deferredPrompt = null;
+            });
+          }
+        });
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
