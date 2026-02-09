@@ -1,18 +1,16 @@
 :root {
-  --bg: #090c12;
-  --card: #141a26;
-  --panel: #1a2335;
+  --bg: #0a0f18;
+  --card: #121826;
+  --panel: #1a2233;
   --accent: #7e57c2;
   --accent-light: #b39ddb;
   --success: #4ade80;
-  --experiment: #7209b7;
-  --crit: #ffcc00;
   --surface-ground: var(--bg);
   --surface-card: var(--card);
   --surface-overlay: var(--panel);
-  --surface-border: #2d3748;
+  --surface-border: #2b364c;
   --text-color: #e2e8f0;
-  --text-color-secondary: #a0aec0;
+  --text-color-secondary: #94a3b8;
 }
 
 * {
@@ -25,9 +23,13 @@ body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--text-color);
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
 
 button {
   font-family: inherit;
+}
+
+p {
+  line-height: 1.6;
 }

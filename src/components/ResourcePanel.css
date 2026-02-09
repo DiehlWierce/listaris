@@ -1,30 +1,36 @@
 .resources-panel {
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  margin-bottom: 1rem;
-  padding: 0.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+  padding: 1rem;
   background: var(--surface-ground);
-  border-radius: 8px;
+  border-radius: 12px;
   border: 1px solid var(--surface-border);
 }
 
 .resource-item {
-  text-align: center;
-  padding: 0 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .resource-label {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--text-color-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .resource-value {
-  font-weight: bold;
+  font-weight: 700;
+  font-size: 1.1rem;
   color: var(--text-color);
 }
 
-.resource-per-sec {
-  font-size: 0.7rem;
+.resource-hint {
+  font-size: 0.75rem;
   color: var(--text-color-secondary);
 }
