@@ -1,16 +1,18 @@
 :root {
-  --bg: #0a0f18;
-  --card: #121826;
-  --panel: #1a2233;
-  --accent: #7e57c2;
-  --accent-light: #b39ddb;
-  --success: #4ade80;
+  --bg: #060b21;
+  --card: rgba(13, 20, 38, 0.9);
+  --panel: rgba(20, 31, 59, 0.92);
+  --accent: #ff5edb;
+  --accent-light: #5bf2ff;
+  --success: #6dff8a;
+  --warning: #ffd166;
+  --glow: rgba(91, 242, 255, 0.3);
   --surface-ground: var(--bg);
   --surface-card: var(--card);
   --surface-overlay: var(--panel);
-  --surface-border: #2b364c;
-  --text-color: #e2e8f0;
-  --text-color-secondary: #94a3b8;
+  --surface-border: rgba(91, 242, 255, 0.2);
+  --text-color: #f5f7ff;
+  --text-color-secondary: #b7c1ff;
 }
 
 * {
@@ -21,9 +23,11 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background: var(--bg);
+  background: radial-gradient(circle at top, rgba(255, 94, 219, 0.2), transparent 55%),
+    radial-gradient(circle at 20% 20%, rgba(91, 242, 255, 0.18), transparent 45%),
+    var(--bg);
   color: var(--text-color);
-  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Manrope', 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
 
 button {

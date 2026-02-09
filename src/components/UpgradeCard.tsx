@@ -22,9 +22,15 @@ const UpgradeCard = ({ upgrade, isOwned, isLocked, canBuy, onBuy, requirementLab
     </div>
     <div className="shop-card__meta">
       <div>
-        <span>Стоимость</span>
+        <span>Листы</span>
         <strong>{formatNumber(upgrade.cost)}</strong>
       </div>
+      {upgrade.sparkCost && (
+        <div>
+          <span>Искры</span>
+          <strong>{formatNumber(upgrade.sparkCost, 1)}</strong>
+        </div>
+      )}
       {requirementLabels.map((label) => (
         <div key={label}>
           <span>Условие</span>

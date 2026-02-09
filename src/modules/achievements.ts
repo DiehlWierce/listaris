@@ -3,50 +3,64 @@ export type Achievement = {
   title: string
   description: string
   target: number
-  metric: 'coins' | 'clicks' | 'buildings' | 'upgrades' | 'coinsPerSec'
+  metric: 'coins' | 'clicks' | 'buildings' | 'upgrades' | 'coinsPerSec' | 'sparks' | 'prestige'
 }
 
 export const achievements: Achievement[] = [
   {
     id: 'first-scroll',
-    title: 'Первые листы',
-    description: 'Соберите 50 листов.',
-    target: 50,
+    title: 'Первые листы ✨',
+    description: 'Соберите 75 листов.',
+    target: 75,
     metric: 'coins'
   },
   {
     id: 'steady-hands',
-    title: 'Твёрдая рука',
-    description: 'Совершите 100 кликов.',
-    target: 100,
+    title: 'Ритм города',
+    description: 'Совершите 150 кликов.',
+    target: 150,
     metric: 'clicks'
   },
   {
     id: 'camp-master',
-    title: 'Организатор лагеря',
-    description: 'Постройте 8 объектов.',
-    target: 8,
+    title: 'Архитектор огней',
+    description: 'Постройте 10 объектов.',
+    target: 10,
     metric: 'buildings'
   },
   {
     id: 'archive-keeper',
-    title: 'Хранитель архивов',
-    description: 'Приобретите 3 улучшения.',
-    target: 3,
+    title: 'Куратор импульсов',
+    description: 'Приобретите 4 улучшения.',
+    target: 4,
     metric: 'upgrades'
   },
   {
     id: 'signal-network',
-    title: 'Сеть разведки',
-    description: 'Достигните 75 листов в секунду.',
-    target: 75,
+    title: 'Световая сеть',
+    description: 'Достигните 120 листов в секунду.',
+    target: 120,
     metric: 'coinsPerSec'
   },
   {
+    id: 'spark-burst',
+    title: 'Искровой всплеск',
+    description: 'Накопите 30 искр.',
+    target: 30,
+    metric: 'sparks'
+  },
+  {
     id: 'chronicle-legend',
-    title: 'Легенда хроник',
-    description: 'Соберите 25 000 листов.',
-    target: 25000,
+    title: 'Легенда люмена',
+    description: 'Соберите 40 000 листов.',
+    target: 40000,
     metric: 'coins'
+  },
+  {
+    id: 'first-prestige',
+    title: 'Первое сияние',
+    description: 'Получите 1 очко престижа.',
+    target: 1,
+    metric: 'prestige'
   }
 ]

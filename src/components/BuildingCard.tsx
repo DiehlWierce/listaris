@@ -7,10 +7,24 @@ type BuildingCardProps = {
   onBuy: () => void
   incomePerUnit: number
   totalIncome: number
+  sparkIncomePerUnit: number
+  sparkTotalIncome: number
+  sparkCost: number
 }
 
-const BuildingCard = ({ building, canBuy, onBuy, incomePerUnit, totalIncome }: BuildingCardProps) => {
+const BuildingCard = ({
+  building,
+  canBuy,
+  onBuy,
+  incomePerUnit,
+  totalIncome,
+  sparkIncomePerUnit,
+  sparkTotalIncome,
+  sparkCost
+}: BuildingCardProps) => {
   const cost = getBuildingCost(building)
+  const hasSparkIncome = sparkIncomePerUnit > 0 || sparkTotalIncome > 0
+  const hasSparkCost = sparkCost > 0
 
   return (
     <div className="shop-card">
@@ -30,10 +44,22 @@ const BuildingCard = ({ building, canBuy, onBuy, incomePerUnit, totalIncome }: B
           <span>Итого</span>
           <strong>+{formatNumber(totalIncome, 2)}/сек</strong>
         </div>
+        {hasSparkIncome && (
+          <div>
+            <span>Искры</span>
+            <strong>+{formatNumber(sparkTotalIncome, 2)}/сек</strong>
+          </div>
+        )}
         <div>
           <span>Стоимость</span>
           <strong>{formatNumber(cost)}</strong>
         </div>
+        {hasSparkCost && (
+          <div>
+            <span>Искры</span>
+            <strong>{formatNumber(sparkCost, 1)}</strong>
+          </div>
+        )}
       </div>
       <button className="primary-button" type="button" onClick={onBuy} disabled={!canBuy}>
         Купить
