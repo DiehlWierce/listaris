@@ -1,0 +1,30 @@
+.resources-panel {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background: var(--surface-ground);
+  border-radius: 8px;
+  border: 1px solid var(--surface-border);
+}
+
+.resource-item {
+  text-align: center;
+  padding: 0 0.5rem;
+}
+
+.resource-label {
+  font-size: 0.8rem;
+  color: var(--text-color-secondary);
+}
+
+.resource-value {
+  font-weight: bold;
+  color: var(--text-color);
+}
+
+.resource-per-sec {
+  font-size: 0.7rem;
+  color: var(--text-color-secondary);
+}

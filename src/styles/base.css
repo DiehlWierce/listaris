@@ -1,0 +1,33 @@
+:root {
+  --bg: #090c12;
+  --card: #141a26;
+  --panel: #1a2335;
+  --accent: #7e57c2;
+  --accent-light: #b39ddb;
+  --success: #4ade80;
+  --experiment: #7209b7;
+  --crit: #ffcc00;
+  --surface-ground: var(--bg);
+  --surface-card: var(--card);
+  --surface-overlay: var(--panel);
+  --surface-border: #2d3748;
+  --text-color: #e2e8f0;
+  --text-color-secondary: #a0aec0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text-color);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+button {
+  font-family: inherit;
+}
