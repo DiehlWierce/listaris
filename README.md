@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./listaris-ui.png" width="600" alt="Listaris">
+  <img src="./listaris-ui-v2.png" width="600" alt="Listaris">
 </p>
 
 # Листарис
