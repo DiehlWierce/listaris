@@ -5,9 +5,11 @@ type BuildingCardProps = {
   building: Building
   canBuy: boolean
   onBuy: () => void
+  incomePerUnit: number
+  totalIncome: number
 }
 
-const BuildingCard = ({ building, canBuy, onBuy }: BuildingCardProps) => {
+const BuildingCard = ({ building, canBuy, onBuy, incomePerUnit, totalIncome }: BuildingCardProps) => {
   const cost = getBuildingCost(building)
 
   return (
@@ -21,8 +23,12 @@ const BuildingCard = ({ building, canBuy, onBuy }: BuildingCardProps) => {
       </div>
       <div className="shop-card__meta">
         <div>
-          <span>Доход</span>
-          <strong>+{formatNumber(building.baseIncome, 2)}/сек</strong>
+          <span>Доход за 1</span>
+          <strong>+{formatNumber(incomePerUnit, 2)}/сек</strong>
+        </div>
+        <div>
+          <span>Итого</span>
+          <strong>+{formatNumber(totalIncome, 2)}/сек</strong>
         </div>
         <div>
           <span>Стоимость</span>

@@ -54,6 +54,50 @@ export const buildingData: Building[] = [
     costExp: 1.22,
     chapter: 2,
     unlockAt: 850
+  },
+  {
+    id: 'research-atrium',
+    name: 'Исследовательский атриум',
+    desc: 'Собирает учёных, чтобы быстро анализировать находки.',
+    baseIncome: 28,
+    count: 0,
+    costBase: 4200,
+    costExp: 1.24,
+    chapter: 3,
+    unlockAt: 2400
+  },
+  {
+    id: 'signal-tower',
+    name: 'Сигнальная башня',
+    desc: 'Связывает лагеря в единую сеть и ускоряет обмен данными.',
+    baseIncome: 68,
+    count: 0,
+    costBase: 12800,
+    costExp: 1.25,
+    chapter: 3,
+    unlockAt: 6400
+  },
+  {
+    id: 'chronicle-vault',
+    name: 'Хранилище хроник',
+    desc: 'Систематизирует редкие тексты и защищает их от потерь.',
+    baseIncome: 140,
+    count: 0,
+    costBase: 38000,
+    costExp: 1.27,
+    chapter: 4,
+    unlockAt: 18000
+  },
+  {
+    id: 'orbital-array',
+    name: 'Орбитальная решётка',
+    desc: 'Запускает сеть спутников для ускорения разведки.',
+    baseIncome: 320,
+    count: 0,
+    costBase: 98000,
+    costExp: 1.28,
+    chapter: 4,
+    unlockAt: 52000
   }
 ]
 

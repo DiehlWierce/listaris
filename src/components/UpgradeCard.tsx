@@ -4,17 +4,19 @@ import { formatNumber } from '../modules/format'
 type UpgradeCardProps = {
   upgrade: Upgrade
   isOwned: boolean
+  isLocked: boolean
   canBuy: boolean
   onBuy: () => void
-  requirementLabel?: string
+  requirementLabels: string[]
 }
 
-const UpgradeCard = ({ upgrade, isOwned, canBuy, onBuy, requirementLabel }: UpgradeCardProps) => (
-  <div className={`shop-card${isOwned ? ' shop-card--owned' : ''}`}>
+const UpgradeCard = ({ upgrade, isOwned, isLocked, canBuy, onBuy, requirementLabels }: UpgradeCardProps) => (
+  <div className={`shop-card${isOwned ? ' shop-card--owned' : ''}${isLocked ? ' shop-card--locked' : ''}`}>
     <div>
       <div className="shop-card__title">
         <h4>{upgrade.name}</h4>
-        {isOwned && <span className="status-pill status-pill--owned">Приобретено</span>}
+        {isOwned && <span className="status-pill status-pill--owned">Активно</span>}
+        {!isOwned && isLocked && <span className="status-pill">Закрыто</span>}
       </div>
       <p className="shop-card__desc">{upgrade.desc}</p>
     </div>
@@ -23,12 +25,12 @@ const UpgradeCard = ({ upgrade, isOwned, canBuy, onBuy, requirementLabel }: Upgr
         <span>Стоимость</span>
         <strong>{formatNumber(upgrade.cost)}</strong>
       </div>
-      {requirementLabel && (
-        <div>
+      {requirementLabels.map((label) => (
+        <div key={label}>
           <span>Условие</span>
-          <strong>{requirementLabel}</strong>
+          <strong>{label}</strong>
         </div>
-      )}
+      ))}
     </div>
     <button className="primary-button" type="button" onClick={onBuy} disabled={!canBuy}>
       {isOwned ? 'Готово' : 'Улучшить'}

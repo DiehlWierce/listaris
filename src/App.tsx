@@ -3,12 +3,14 @@ import BuildingCard from './components/BuildingCard'
 import ResourcePanel from './components/ResourcePanel'
 import SectionCard from './components/SectionCard'
 import UpgradeCard from './components/UpgradeCard'
+import { achievements } from './modules/achievements'
 import { buildingData, getBuildingCost, type Building } from './modules/buildings'
+import { faqItems } from './modules/faq'
 import { formatDateTime, formatNumber } from './modules/format'
-import { futureBlocks, qualityChecklist, roadmapItems } from './modules/roadmap'
+import { storyParagraphs } from './modules/story'
 import { upgradeData } from './modules/upgrades'
 
-const SAVE_KEY = 'listaris.save.v1'
+const SAVE_KEY = 'listaris.save.v2'
 
 const initialBuildings = buildingData.map((building) => ({ ...building }))
 
@@ -69,10 +71,18 @@ const hydrateState = (saved?: Partial<GameState>): GameState => {
 const meetsUpgradeRequirement = (state: GameState, upgradeId: string): boolean => {
   const upgrade = upgradeData.find((item) => item.id === upgradeId)
   if (!upgrade) return false
-  if (!upgrade.requiresBuildings || !upgrade.targetBuildingId) return true
 
-  const targetBuilding = state.buildings.find((building) => building.id === upgrade.targetBuildingId)
-  return (targetBuilding?.count ?? 0) >= upgrade.requiresBuildings
+  if (upgrade.requiresBuildings && upgrade.targetBuildingId) {
+    const targetBuilding = state.buildings.find((building) => building.id === upgrade.targetBuildingId)
+    if ((targetBuilding?.count ?? 0) < upgrade.requiresBuildings) return false
+  }
+
+  if (upgrade.requiresTotalBuildings) {
+    const totalBuildings = state.buildings.reduce((sum, building) => sum + building.count, 0)
+    if (totalBuildings < upgrade.requiresTotalBuildings) return false
+  }
+
+  return true
 }
 
 const gameReducer = (state: GameState, action: GameAction): GameState => {
@@ -101,6 +111,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       const upgrade = upgradeData.find((item) => item.id === action.id)
       if (!upgrade) return state
       if (state.coins < upgrade.cost) return state
+      if (state.coins < upgrade.unlockAt) return state
       if (!meetsUpgradeRequirement(state, action.id)) return state
       return {
         ...state,
@@ -123,8 +134,9 @@ const tabs = [
   { id: 'overview', label: 'Обзор' },
   { id: 'buildings', label: 'Постройки' },
   { id: 'upgrades', label: 'Улучшения' },
-  { id: 'progress', label: 'Прогресс' },
-  { id: 'roadmap', label: 'Дорожная карта' }
+  { id: 'achievements', label: 'Достижения' },
+  { id: 'story', label: 'История мира' },
+  { id: 'faq', label: 'FAQ' }
 ]
 
 const App = () => {
@@ -138,6 +150,15 @@ const App = () => {
 
   const ownedUpgrades = useMemo(() => new Set(state.upgrades), [state.upgrades])
 
+  const globalIncomeMultiplier = useMemo(() => {
+    return upgradeData.reduce((sum, upgrade) => {
+      if (!upgrade.targetBuildingId && upgrade.incomeMultiplier && ownedUpgrades.has(upgrade.id)) {
+        return sum + upgrade.incomeMultiplier
+      }
+      return sum
+    }, 0)
+  }, [ownedUpgrades])
+
   const clickBonus = useMemo(
     () =>
       upgradeData.reduce((sum, upgrade) =>
@@ -148,9 +169,9 @@ const App = () => {
     [ownedUpgrades]
   )
 
-  const coinsPerSec = useMemo(() => {
-    return state.buildings.reduce((sum, building) => {
-      const upgradeMultiplier = upgradeData.reduce((acc, upgrade) => {
+  const buildingIncomeMap = useMemo(() => {
+    return state.buildings.reduce((map, building) => {
+      const buildingMultiplier = upgradeData.reduce((acc, upgrade) => {
         if (
           upgrade.targetBuildingId === building.id &&
           ownedUpgrades.has(upgrade.id) &&
@@ -161,9 +182,22 @@ const App = () => {
         return acc
       }, 0)
 
-      return sum + building.count * building.baseIncome * (1 + upgradeMultiplier)
-    }, 0)
-  }, [ownedUpgrades, state.buildings])
+      const incomePerUnit = building.baseIncome * (1 + buildingMultiplier + globalIncomeMultiplier)
+      const totalIncome = incomePerUnit * building.count
+
+      return {
+        ...map,
+        [building.id]: {
+          incomePerUnit,
+          totalIncome
+        }
+      }
+    }, {} as Record<string, { incomePerUnit: number; totalIncome: number }>)
+  }, [globalIncomeMultiplier, ownedUpgrades, state.buildings])
+
+  const coinsPerSec = useMemo(() => {
+    return state.buildings.reduce((sum, building) => sum + (buildingIncomeMap[building.id]?.totalIncome ?? 0), 0)
+  }, [buildingIncomeMap, state.buildings])
 
   useEffect(() => {
     const saved = localStorage.getItem(SAVE_KEY)
@@ -240,6 +274,8 @@ const App = () => {
     .sort((a, b) => a.unlockAt - b.unlockAt)
     .find(Boolean)
 
+  const totalBuildings = state.buildings.reduce((sum, building) => sum + building.count, 0)
+
   const resourceItems = [
     {
       id: 'coins',
@@ -256,10 +292,27 @@ const App = () => {
     {
       id: 'buildings',
       label: 'Постройки',
-      value: `${state.buildings.reduce((sum, building) => sum + building.count, 0)}`,
+      value: `${totalBuildings}`,
       hint: nextBuilding ? `Следующее: ${nextBuilding.name}` : 'Все здания открыты'
     }
   ]
+
+  const achievementProgress = (metric: string): number => {
+    switch (metric) {
+      case 'coins':
+        return state.coins
+      case 'clicks':
+        return state.totalClicks
+      case 'buildings':
+        return totalBuildings
+      case 'upgrades':
+        return state.upgrades.length
+      case 'coinsPerSec':
+        return coinsPerSec
+      default:
+        return 0
+    }
+  }
 
   return (
     <div className="app-container">
@@ -267,10 +320,10 @@ const App = () => {
         <header className="app-header">
           <div className="header-top">
             <div>
-              <span className="pre-release-pill">Релизная сборка · v1.0</span>
+              <span className="pre-release-pill">Центр экспедиции</span>
               <h1 className="app-title">Листарис</h1>
               <p className="subtitle">
-                Ведите экспедицию, расшифровывайте хроники и стройте инфраструктуру древней цивилизации.
+                Руководите раскопками, усиливайте команду и собирайте древние листы, чтобы раскрыть тайны мира.
               </p>
             </div>
             <div className="header-actions">
@@ -289,7 +342,7 @@ const App = () => {
         <main className="app-main">
           <section className="hero-panel">
             <div className="hero-copy">
-              <h2>Командный центр экспедиции</h2>
+              <h2>Пульс экспедиции</h2>
               <p>
                 Быстро запускайте раскопки, отслеживайте ключевые показатели и открывайте новые постройки.
               </p>
@@ -341,7 +394,7 @@ const App = () => {
                 <section className="overview-grid">
                   <SectionCard
                     title="Панель контроля"
-                    description="Следите за основными метриками, чтобы держать экономику в зелёной зоне."
+                    description="Следите за основными метриками, чтобы держать темп экспедиции."
                     accent
                   >
                     <ul className="clean-list">
@@ -351,26 +404,32 @@ const App = () => {
                     </ul>
                   </SectionCard>
                   <SectionCard
-                    title="Сценарии на сегодня"
-                    description="Рекомендуемые шаги, чтобы ускорить рост."
+                    title="Рекомендуемые шаги"
+                    description="Небольшой чек-лист для ускорения роста."
                   >
                     <ol className="clean-list">
-                      <li>Купить хотя бы 2 экскаватора.</li>
-                      <li>Подготовить лагерь и открыть Архив.</li>
-                      <li>Собрать апгрейд для ускорения кликов.</li>
+                      <li>Купить 2–3 экскаватора.</li>
+                      <li>Развернуть полевой лагерь и архив.</li>
+                      <li>Подобрать апгрейд для клика и дохода.</li>
                     </ol>
                   </SectionCard>
                   <SectionCard
-                    title="Будущие доработки"
-                    description="Блоки, обозначенные ранее как запланированные, теперь структурированы для релиза."
+                    title="Экспедиционная выжимка"
+                    description="Что уже доступно прямо сейчас."
                   >
                     <div className="chip-grid">
-                      {futureBlocks.map((block) => (
-                        <div className="chip" key={block.title}>
-                          <strong>{block.title}</strong>
-                          <span>{block.description}</span>
-                        </div>
-                      ))}
+                      <div className="chip">
+                        <strong>Сохранения</strong>
+                        <span>Прогресс фиксируется автоматически.</span>
+                      </div>
+                      <div className="chip">
+                        <strong>Мультипликаторы</strong>
+                        <span>Апгрейды усиливают здания и клики.</span>
+                      </div>
+                      <div className="chip">
+                        <strong>Расширение базы</strong>
+                        <span>Новые постройки открываются по мере роста.</span>
+                      </div>
                     </div>
                   </SectionCard>
                 </section>
@@ -378,14 +437,19 @@ const App = () => {
 
               {activeTab === 'buildings' && (
                 <section className="shop-grid">
-                  {buildingsUnlocked.map((building) => (
-                    <BuildingCard
-                      key={building.id}
-                      building={building}
-                      canBuy={state.coins >= getBuildingCost(building)}
-                      onBuy={() => dispatch({ type: 'buyBuilding', id: building.id })}
-                    />
-                  ))}
+                  {buildingsUnlocked.map((building) => {
+                    const incomeData = buildingIncomeMap[building.id] ?? { incomePerUnit: 0, totalIncome: 0 }
+                    return (
+                      <BuildingCard
+                        key={building.id}
+                        building={building}
+                        canBuy={state.coins >= getBuildingCost(building)}
+                        onBuy={() => dispatch({ type: 'buyBuilding', id: building.id })}
+                        incomePerUnit={incomeData.incomePerUnit}
+                        totalIncome={incomeData.totalIncome}
+                      />
+                    )
+                  })}
                   {lockedBuildings.map((building) => (
                     <div className="shop-card shop-card--locked" key={building.id}>
                       <div>
@@ -404,84 +468,85 @@ const App = () => {
                 <section className="shop-grid">
                   {upgradeData.map((upgrade) => {
                     const isOwned = ownedUpgrades.has(upgrade.id)
-                    const targetBuilding = state.buildings.find(
-                      (building) => building.id === upgrade.targetBuildingId
-                    )
-                    const meetsRequirement = upgrade.requiresBuildings
-                      ? (targetBuilding?.count ?? 0) >= upgrade.requiresBuildings
-                      : true
-                    const canBuy = state.coins >= upgrade.cost && !isOwned && meetsRequirement
+                    const isUnlocked = state.coins >= upgrade.unlockAt || isOwned
+                    const meetsRequirement = meetsUpgradeRequirement(state, upgrade.id)
+                    const canBuy = state.coins >= upgrade.cost && !isOwned && meetsRequirement && isUnlocked
 
-                    const requirementLabel = upgrade.requiresBuildings
-                      ? `${upgrade.requiresBuildings}+ ${targetBuilding?.name ?? 'построек'}`
-                      : undefined
+                    const requirementLabels = [
+                      `Открывается при ${formatNumber(upgrade.unlockAt)} листах.`
+                    ]
+
+                    if (upgrade.requiresBuildings && upgrade.targetBuildingId) {
+                      const targetBuilding = state.buildings.find(
+                        (building) => building.id === upgrade.targetBuildingId
+                      )
+                      requirementLabels.push(`Нужно ${upgrade.requiresBuildings}+ ${targetBuilding?.name ?? 'построек'}.`)
+                    }
+
+                    if (upgrade.requiresTotalBuildings) {
+                      requirementLabels.push(`Нужно ${upgrade.requiresTotalBuildings}+ построек.`)
+                    }
 
                     return (
                       <UpgradeCard
                         key={upgrade.id}
                         upgrade={upgrade}
                         isOwned={isOwned}
+                        isLocked={!isUnlocked}
                         canBuy={canBuy}
                         onBuy={() => dispatch({ type: 'buyUpgrade', id: upgrade.id })}
-                        requirementLabel={requirementLabel}
+                        requirementLabels={requirementLabels}
                       />
                     )
                   })}
                 </section>
               )}
 
-              {activeTab === 'progress' && (
+              {activeTab === 'achievements' && (
                 <section className="overview-grid">
-                  <SectionCard
-                    title="Качество релиза"
-                    description="Проверьте, что продукт готов к продаже и масштабированию."
-                    accent
-                  >
-                    <ul className="clean-list">
-                      {qualityChecklist.map((item) => (
-                        <li key={item}>{item}</li>
+                  {achievements.map((achievement) => {
+                    const progress = achievementProgress(achievement.metric)
+                    const progressPercent = Math.min(100, (progress / achievement.target) * 100)
+                    const isUnlocked = progress >= achievement.target
+
+                    return (
+                      <SectionCard
+                        key={achievement.id}
+                        title={achievement.title}
+                        description={achievement.description}
+                        accent={isUnlocked}
+                      >
+                        <div className="achievement-progress">
+                          <div className="achievement-bar">
+                            <div className="achievement-bar__fill" style={{ width: `${progressPercent}%` }} />
+                          </div>
+                          <div className="achievement-meta">
+                            <span>{formatNumber(progress, 0)} / {formatNumber(achievement.target, 0)}</span>
+                            <strong>{isUnlocked ? 'Открыто' : 'В процессе'}</strong>
+                          </div>
+                        </div>
+                      </SectionCard>
+                    )
+                  })}
+                </section>
+              )}
+
+              {activeTab === 'story' && (
+                <section className="story-panel">
+                  <SectionCard title="Хроники Листариса" description="Легенда мира, который вы восстанавливаете.">
+                    <div className="story-text">
+                      {storyParagraphs.map((paragraph) => (
+                        <p key={paragraph}>{paragraph}</p>
                       ))}
-                    </ul>
-                  </SectionCard>
-                  <SectionCard
-                    title="Технический статус"
-                    description="Ключевые системы, которые уже активны в релизе."
-                  >
-                    <ul className="clean-list">
-                      <li>Автодобыча каждые 100 мс.</li>
-                      <li>Динамическая экономика построек.</li>
-                      <li>Сохранение прогресса локально.</li>
-                      <li>UI оптимизирован под короткие сессии.</li>
-                    </ul>
-                  </SectionCard>
-                  <SectionCard
-                    title="Следующие контрольные точки"
-                    description="Сфокусируйтесь на росте вовлечённости."
-                  >
-                    <ol className="clean-list">
-                      <li>Добавить ежедневные задания.</li>
-                      <li>Запустить линейку достижений.</li>
-                      <li>Подготовить сюжетный акт II.</li>
-                    </ol>
+                    </div>
                   </SectionCard>
                 </section>
               )}
 
-              {activeTab === 'roadmap' && (
+              {activeTab === 'faq' && (
                 <section className="overview-grid">
-                  {roadmapItems.map((item) => (
-                    <SectionCard
-                      key={item.id}
-                      title={item.title}
-                      description={item.status === 'ready' ? 'Готово' : item.status === 'active' ? 'В работе' : 'Запланировано'}
-                      accent={item.status === 'active'}
-                    >
-                      <ul className="clean-list">
-                        {item.items.map((entry) => (
-                          <li key={entry}>{entry}</li>
-                        ))}
-                      </ul>
-                    </SectionCard>
+                  {faqItems.map((item) => (
+                    <SectionCard key={item.id} title={item.question} description={item.answer} />
                   ))}
                 </section>
               )}
